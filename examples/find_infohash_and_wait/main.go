@@ -16,49 +16,76 @@ package main
 import (
 	"flag"
 	"fmt"
+	"encoding/hex"
 	"net/http"
 	"os"
+	"log"
+	"net"
 	"time"
 
-	"github.com/nictuku/dht"
+	"github.com/qsun/dht"
 )
+
+var infoHashQueryChan chan string
+var DHTMapping map[int]*dht.DHT
 
 const (
 	httpPortTCP = 8711
 	numTarget   = 10
-	exampleIH   = "deca7a89a1dbdc4b213de1c0d5351e92582f31fb" // ubuntu-12.04.4-desktop-amd64.iso
+	// exampleIH   = "deca7a89a1dbdc4b213de1c0d5351e92582f31fb" // ubuntu-12.04.4-desktop-amd64.iso
 )
+
+/* dht.Logger */
+type InfoHashLogger struct {
+	DHTId int
+}
+
+func (l *InfoHashLogger) GetPeers(peer net.UDPAddr, id string, infoHash dht.InfoHash) {
+	log.Println("Query: ", peer, "id: ", hex.EncodeToString([]byte(id)),
+		"InfoHash: ", hex.EncodeToString([]byte(infoHash)))
+}
 
 func main() {
 	flag.Parse()
-	// To see logs, use the -logtostderr flag and change the verbosity with
-	// -v 0 (less verbose) up to -v 5 (more verbose).
-	if len(flag.Args()) != 1 {
-		fmt.Fprintf(os.Stderr, "Usage: %v <infohash>\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Example infohash: %v\n", exampleIH)
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	ih, err := dht.DecodeInfoHash(flag.Args()[0])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "DecodeInfoHash error: %v\n", err)
-		os.Exit(1)
-	}
-	// Starts a DHT node with the default options. It picks a random UDP port. To change this, see dht.NewConfig.
-	d, err := dht.New(nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "New DHT error: %v", err)
-		os.Exit(1)
 
+	DHTMapping = make(map[int]*dht.DHT)
+
+	initControl()
+
+	node_count := 0
+	
+	for node_count < 30 {
+		// Starts a DHT node with the default options. It picks a random UDP port. To change this, see dht.NewConfig.
+		d, err := dht.New(nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "New DHT error: %v", err)
+			os.Exit(1)
+
+		}
+
+		d.Logger = &InfoHashLogger{node_count}
+
+		go d.Run()
+		go drainresults(d)
+
+		DHTMapping[node_count] = d
+
+		node_count = node_count + 1
 	}
+
 	// For debugging.
 	go http.ListenAndServe(fmt.Sprintf(":%d", httpPortTCP), nil)
 
-	go d.Run()
-	go drainresults(d)
 
 	for {
-		d.PeersRequest(string(ih), false)
+		infoHashQuery := <- infoHashQueryChan
+		log.Println("Retrieve: ", infoHashQuery)
+
+		for _, dhtNet := range DHTMapping {
+			
+			dhtNet.PeerRequest(hex.
+		}
+		
 		time.Sleep(5 * time.Second)
 	}
 }

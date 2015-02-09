@@ -31,6 +31,7 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"expvar"
+	// nlog "log"
 	"flag"
 	"fmt"
 	"io"
@@ -696,6 +697,8 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 }
 
 func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
+	// nlog.Println("Got peers: ", r, " from ", addr)
+
 	totalRecvGetPeers.Add(1)
 	if log.V(3) {
 		log.Infof("DHT get_peers. Host: %v , nodeID: %x , InfoHash: %x , distance to me: %x",
@@ -705,6 +708,8 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 	if d.Logger != nil {
 		d.Logger.GetPeers(addr, r.A.Id, r.A.InfoHash)
 	}
+
+	// nlog.Println("looking for: ", r.A.InfoHash)
 
 	ih := r.A.InfoHash
 	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, d.tokenSecrets[0])}
